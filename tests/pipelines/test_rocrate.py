@@ -4,6 +4,7 @@ import json
 import shutil
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import git
 import rocrate.rocrate
@@ -21,6 +22,57 @@ from ..test_pipelines import TestPipelines
 
 class TestROCrate(TestPipelines):
     """Class for lint tests"""
+
+    @staticmethod
+    def _mock_pipelines_response(url: str, *args, **kwargs):
+        class MockResponse:
+            def __init__(self, payload, status_code=200, response_url=url):
+                self.payload = payload
+                self.status_code = status_code
+                self.url = response_url
+
+            def json(self):
+                return self.payload
+
+        if url == "https://nf-co.re/pipelines.json":
+            return MockResponse(
+                {
+                    "remote_workflows": [
+                        {
+                            "full_name": "nf-core/testpipeline",
+                            "name": "testpipeline",
+                            "topics": ["test", "pipeline"],
+                        }
+                    ]
+                }
+            )
+        if url == "https://github.com/my-org/pipelines.json":
+            return MockResponse(
+                {
+                    "remote_workflows": [
+                        {
+                            "full_name": "my-org/testpipeline",
+                            "name": "testpipeline",
+                            "topics": ["custom", "org"],
+                        }
+                    ]
+                }
+            )
+        if url == "https://example.org/pipelines/pipelines.json":
+            return MockResponse(
+                {
+                    "remote_workflows": [
+                        {
+                            "full_name": "my-org/testpipeline",
+                            "name": "testpipeline",
+                            "topics": ["custom", "org"],
+                        }
+                    ]
+                }
+            )
+        if url.startswith("https://pub.orcid.org/v3.0/search/"):
+            return MockResponse({"num-found": 0, "result": []})
+        raise AssertionError(f"Unexpected URL requested: {url}")
 
     def setUp(self) -> None:
         super().setUp()
@@ -43,7 +95,8 @@ class TestROCrate(TestPipelines):
 
         # Run the command
         self.rocrate_obj
-        assert self.rocrate_obj.create_rocrate(self.pipeline_dir, self.pipeline_dir)
+        with patch("nf_core.pipelines.rocrate.requests.get", side_effect=self._mock_pipelines_response):
+            assert self.rocrate_obj.create_rocrate(self.pipeline_dir, self.pipeline_dir)
 
         # Check that the crate was created
         self.assertTrue(Path(self.pipeline_dir, "ro-crate-metadata.json").exists())
@@ -122,7 +175,8 @@ class TestROCrate(TestPipelines):
             yaml.safe_dump(config, fh, sort_keys=False)
 
         self.rocrate_obj = nf_core.pipelines.rocrate.ROCrate(self.pipeline_dir)
-        assert self.rocrate_obj.create_rocrate(self.pipeline_dir, self.pipeline_dir)
+        with patch("nf_core.pipelines.rocrate.requests.get", side_effect=self._mock_pipelines_response):
+            assert self.rocrate_obj.create_rocrate(self.pipeline_dir, self.pipeline_dir)
 
         with open(Path(self.pipeline_dir, "ro-crate-metadata.json")) as fh:
             crate = json.load(fh)
@@ -144,7 +198,8 @@ class TestROCrate(TestPipelines):
             yaml.safe_dump(config, fh, sort_keys=False)
 
         self.rocrate_obj = nf_core.pipelines.rocrate.ROCrate(self.pipeline_dir)
-        assert self.rocrate_obj.create_rocrate(self.pipeline_dir, self.pipeline_dir)
+        with patch("nf_core.pipelines.rocrate.requests.get", side_effect=self._mock_pipelines_response):
+            assert self.rocrate_obj.create_rocrate(self.pipeline_dir, self.pipeline_dir)
 
         with open(Path(self.pipeline_dir, "ro-crate-metadata.json")) as fh:
             crate = json.load(fh)
