@@ -1244,6 +1244,8 @@ class NFCoreTemplateConfig(BaseModel):
 
     org: str | None = None
     """ Organisation name """
+    org_name: str | None = None
+    """ Full organisation name """
     org_url: str | None = None
     """ Organisation URL """
     name: str | None = None
@@ -1435,6 +1437,7 @@ class NFCoreYamlConfig(BaseModel):
 
         template = config.get("template")
         if isinstance(template, dict) and template.get("is_nfcore"):
+            template.pop("org_name", None)
             template.pop("org_url", None)
 
         return config
